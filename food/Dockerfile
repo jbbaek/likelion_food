@@ -1,16 +1,14 @@
-# 1) build
-FROM node:20-alpine AS build
+FROM node:18-alpine
+
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm ci
+RUN npm install
+
 COPY . .
 RUN npm run build
 
-# 2) serve (nginx)
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
+RUN npm install -g serve
 
-# Cloud Run은 8080으로 들어오므로 nginx를 8080으로 돌리기 위한 설정
-COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", "build", "-l", "8080"]
