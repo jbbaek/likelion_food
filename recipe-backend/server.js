@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcrypt");
@@ -6,14 +5,14 @@ const session = require("express-session");
 const cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
-
-const AI_SERVER_URL = "https://likelion-food-572489305334.us-central1.run.app";
-
 const fs = require("fs");
 const path = require("path");
 
 const app = express();
 app.use(express.json());
+
+// ✅ Cloud Run 프록시 뒤면 세션보다 먼저
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "https://likelion-food-frontend-572489305334.us-central1.run.app",
@@ -22,13 +21,9 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // origin 없는 경우(Postman/서버-서버 호출)는 허용
+    origin(origin, callback) {
       if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+      if (allowedOrigins.includes(origin)) return callback(null, true);
       return callback(new Error("Not allowed by CORS: " + origin));
     },
     credentials: true,
@@ -37,8 +32,12 @@ app.use(
   })
 );
 
+app.options("*", cors());
+
+// ✅ health
 app.get("/healthz", (req, res) => res.status(200).send("ok"));
 
+// ✅ 세션은 1번만
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "secret_key",
@@ -51,22 +50,7 @@ app.use(
   })
 );
 
-const isProd = process.env.NODE_ENV === "production";
-
-app.set("trust proxy", 1); // Cloud Run 프록시 뒤에서 필수
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "secret_key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: true,
-      sameSite: "none",
-    },
-  })
-);
-
+// ✅ Pool
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -78,19 +62,10 @@ const db = mysql.createPool({
   queueLimit: 0,
 });
 
-// 서버 시작 시 간단 체크(선택)
+// ✅ pool 테스트 (서버는 계속 살아야 하니까 죽이지 말고 로그만)
 db.query("SELECT 1", (err) => {
   if (err) console.error("DB 풀 연결 테스트 실패:", err.message);
   else console.log("DB 풀 연결 OK");
-});
-
-db.connect((err) => {
-  if (err) {
-    console.error("DB 연결 실패:", err);
-  } else {
-    console.log("DB 연결 성공");
-    db.query("SET NAMES utf8mb4");
-  }
 });
 
 // ================= 회원 관련 =================
