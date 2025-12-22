@@ -7,7 +7,8 @@ const cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
 
-// ✅ 추가: 로컬 레시피 파일에서 seq 조회용
+const AI_SERVER_URL = process.env.AI_SERVER_URL;
+
 const fs = require("fs");
 const path = require("path");
 
@@ -438,24 +439,26 @@ app.get("/api/recipes/by-seq/:seq", (req, res) => {
 app.post("/api/recommend", async (req, res) => {
   const { message } = req.body;
 
-  if (!message || !String(message).trim()) {
+  if (!message?.trim()) {
     return res.status(400).json({ message: "message가 필요합니다." });
   }
 
-  try {
-    const AI_SERVER_URL = process.env.AI_SERVER_URL; // 예: https://ai-xxxxx.a.run.app
+  if (!process.env.AI_SERVER_URL) {
+    return res.status(500).json({
+      message: "AI_SERVER_URL 환경변수가 설정되지 않았습니다.",
+    });
+  }
 
-    await axios.post(`${AI_SERVER_URL}/chat`, {
+  try {
+    const response = await axios.post(`${process.env.AI_SERVER_URL}/chat`, {
       message,
       top_k: 3,
     });
+
     return res.json(response.data);
   } catch (err) {
-    console.error("FastAPI 추천 오류:", err?.response?.data || err.message);
-    return res.status(500).json({
-      message: "AI 추천 실패",
-      error: err?.response?.data || err.message,
-    });
+    console.error("AI 추천 오류:", err.message);
+    return res.status(500).json({ message: "AI 서버 호출 실패" });
   }
 });
 
