@@ -15,8 +15,6 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-import cors from "cors";
-
 const allowedOrigins = [
   "https://likelion-food-frontend-572489305334.us-central1.run.app",
   "http://localhost:3000",
@@ -39,8 +37,19 @@ app.use(
   })
 );
 
-// preflight 대응 (중요)
-app.options("*", cors());
+app.get("/healthz", (req, res) => res.status(200).send("ok"));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "secret_key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: true,
+      sameSite: "none",
+    },
+  })
+);
 
 const isProd = process.env.NODE_ENV === "production";
 
