@@ -58,13 +58,13 @@ app.use(
   })
 );
 
-let db = null;
-
 const hasDbEnv =
-  process.env.DB_HOST &&
-  process.env.DB_USER &&
-  process.env.DB_PASSWORD &&
-  process.env.DB_NAME;
+  !!process.env.DB_HOST &&
+  !!process.env.DB_USER &&
+  !!process.env.DB_PASSWORD &&
+  !!process.env.DB_NAME;
+
+let db = null;
 
 if (!hasDbEnv) {
   console.error("❌ DB env missing. Server will run without DB.");
@@ -98,7 +98,7 @@ function requireDb(req, res, next) {
 // ================= 회원 관련 =================
 
 // 회원가입
-app.post("/api/signup", async (req, res) => {
+app.post("/api/signup", requireDb, async (req, res) => {
   try {
     const { username, password, name } = req.body;
     if (!username || !password || !name) {
@@ -119,7 +119,7 @@ app.post("/api/signup", async (req, res) => {
 });
 
 // 로그인
-app.post("/api/login", (req, res) => {
+app.post("/api/login", requireDb, (req, res) => {
   const { username, password } = req.body;
   db.query(
     "SELECT * FROM users WHERE username=?",
@@ -159,7 +159,7 @@ app.get("/api/me", (req, res) => {
 // ================= 음식 검색/리스트 =================
 
 // 음식 리스트/검색
-app.get("/api/foods", (req, res) => {
+app.get("/api/foods", requireDb, (req, res) => {
   const search = (req.query.search || "").trim();
 
   if (search) {
@@ -425,10 +425,9 @@ const RECIPES_JSONL_PATH = path.resolve(
 // seq -> 레시피 찾아서 반환
 function findRecipeBySeqFromJsonl(seq) {
   if (!fs.existsSync(RECIPES_JSONL_PATH)) {
-    return res
-      .status(404)
-      .json({ message: "recipes.jsonl not found on server" });
+    return { error: "recipes.jsonl not found on server" };
   }
+
   const content = fs.readFileSync(RECIPES_JSONL_PATH, "utf-8");
   const lines = content.split(/\r?\n/);
 
@@ -436,28 +435,28 @@ function findRecipeBySeqFromJsonl(seq) {
     if (!line.trim()) continue;
     try {
       const obj = JSON.parse(line);
-      // 파일 구조가 { RCP_SEQ: "31", ... } 형태라고 가정
-      if (String(obj.RCP_SEQ) === String(seq)) return obj;
+      if (String(obj.RCP_SEQ) === String(seq)) return { recipe: obj };
     } catch {
-      // 깨진 줄은 스킵
+      // skip
     }
   }
-  return null;
+  return { recipe: null };
 }
 
-// ✅ 프론트 RecipeDetail이 쓰는 API (이제 식약처 안감)
 app.get("/api/recipes/by-seq/:seq", (req, res) => {
   const seq = String(req.params.seq || "").trim();
   if (!seq) return res.status(400).json({ message: "seq 필요" });
 
   try {
-    const recipe = findRecipeBySeqFromJsonl(seq);
-    if (!recipe) {
-      return res
-        .status(404)
-        .json({ message: "해당 SEQ 레시피를 찾을 수 없습니다.", seq });
+    const result = findRecipeBySeqFromJsonl(seq);
+
+    if (result.error) {
+      return res.status(404).json({ message: result.error });
     }
-    return res.json(recipe);
+    if (!result.recipe) {
+      return res.status(404).json({ message: "해당 SEQ 레시피 없음", seq });
+    }
+    return res.json(result.recipe);
   } catch (e) {
     console.error("로컬 seq 조회 오류:", e.message);
     return res
@@ -493,8 +492,9 @@ app.post("/api/recommend", async (req, res) => {
   }
 });
 
-// 서버 시작
 const PORT = process.env.PORT || 8080;
+
+// Cloud Run에서는 0.0.0.0 바인딩 권장
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("server listening on", PORT);
+  console.log(`Server listening on ${PORT}`);
 });
