@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.REACT_APP_API_BASE;
 
 function RecipeDetail() {
   const { seq } = useParams();
@@ -37,7 +37,10 @@ function RecipeDetail() {
 
         const res = await fetch(
           `${API_BASE}/api/recipes/by-seq/${encodeURIComponent(seq)}`,
-          { cache: "no-store" }
+          {
+            cache: "no-store",
+            credentials: "include",
+          }
         );
 
         const data = await res.json().catch(() => ({}));

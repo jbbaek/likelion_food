@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.REACT_APP_API_BASE;
 
 function Mainpage() {
   const [query, setQuery] = useState("");
@@ -53,7 +53,9 @@ function Mainpage() {
   const fetchList = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch(`${API_BASE}/api/foods`);
+      const res = await fetch(`${API_BASE}/api/foods`, {
+        credentials: "include",
+      });
       const data = await res.json();
       safeSetFoods(data);
     } catch (err) {
@@ -211,6 +213,7 @@ function Mainpage() {
       const res = await fetch(`${API_BASE}/api/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ message: userText }),
       });
 

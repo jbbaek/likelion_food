@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+const API_BASE = process.env.REACT_APP_API_BASE;
 
 function FoodDetail() {
   const { id } = useParams();
@@ -10,7 +10,9 @@ function FoodDetail() {
 
   useEffect(() => {
     const fetchFoodDetail = async () => {
-      const res = await axios.get(`${API_BASE}/api/foods/${id}`);
+      const res = await axios.get(`${API_BASE}/api/foods/${id}`, {
+        withCredentials: true, // 세션 기반이면 안전
+      });
       setFood(res.data);
     };
     fetchFoodDetail();
