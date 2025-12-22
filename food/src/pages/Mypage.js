@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 function MyPage() {
   const navigate = useNavigate();
 
@@ -23,7 +25,7 @@ function MyPage() {
   // 로그인 확인
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/me", { withCredentials: true })
+      .get(`${API_BASE}/api/me`, { withCredentials: true })
       .then((res) => setUser(res.data))
       .catch(() => {
         alert("로그인이 필요합니다.");
@@ -33,7 +35,7 @@ function MyPage() {
 
   const loadFoods = async (query = "") => {
     try {
-      const res = await axios.get("http://localhost:5000/api/foods", {
+      const res = await axios.get(`${API_BASE}/api/foods`, {
         params: { search: query },
       });
       setFoods(res.data || []);
@@ -56,7 +58,7 @@ function MyPage() {
     }
 
     try {
-      const res = await axios.get(`http://localhost:5000/api/foods/${foodId}`);
+      const res = await axios.get(`${API_BASE}/api/foods/${foodId}`);
       const { food_name, energy_kcal } = res.data;
 
       setNewRecord({
@@ -74,10 +76,10 @@ function MyPage() {
     if (!user?.id) return;
     try {
       const [recRes, sumRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/records/list", {
+        axios.get(`${API_BASE}/api/records/list`, {
           params: { user_id: user.id, record_date: selectedDate },
         }),
-        axios.get("http://localhost:5000/api/records/summary", {
+        axios.get(`${API_BASE}/api/records/summary`, {
           params: { user_id: user.id, record_date: selectedDate },
         }),
       ]);
@@ -100,7 +102,7 @@ function MyPage() {
 
     try {
       await axios.post(
-        "http://localhost:5000/api/records/add",
+        `${API_BASE}/api/records/add`,
         {
           user_id: user.id,
           food_id: newRecord.food_id,
@@ -125,7 +127,7 @@ function MyPage() {
 
   const deleteRecord = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/records/delete/${id}`, {
+      await axios.delete(`${API_BASE}/api/records/delete/${id}`, {
         withCredentials: true,
       });
       loadData();

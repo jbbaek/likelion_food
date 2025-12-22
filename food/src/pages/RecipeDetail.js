@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 function RecipeDetail() {
   const { seq } = useParams();
   const navigate = useNavigate();
@@ -34,9 +36,10 @@ function RecipeDetail() {
         setRecipe(null);
 
         const res = await fetch(
-          `http://localhost:5000/api/recipes/by-seq/${encodeURIComponent(seq)}`,
+          `${API_BASE}/api/recipes/by-seq/${encodeURIComponent(seq)}`,
           { cache: "no-store" }
         );
+
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {

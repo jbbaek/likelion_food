@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 function FoodDetail() {
   const { id } = useParams();
   const [food, setFood] = useState(null);
 
   useEffect(() => {
     const fetchFoodDetail = async () => {
-      const res = await axios.get(`http://localhost:5000/api/foods/${id}`);
+      const res = await axios.get(`${API_BASE}/api/foods/${id}`);
       setFood(res.data);
     };
     fetchFoodDetail();
@@ -19,13 +21,11 @@ function FoodDetail() {
 
   return (
     <div className="bg-white p-8 rounded-2xl max-w-5xl mx-auto my-8 font-sans">
-      {/* 상단 제목 영역 */}
       <div className="flex justify-center items-center bg-orange-600 text-white text-lg font-bold py-5 rounded-lg mb-8">
         <h2 className="mr-4 text-2xl">{food.food_name}</h2>
         <span className="text-3xl">{food.energy_kcal} kcal</span>
       </div>
 
-      {/* 영양소 카드 그리드 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5 text-center text-lg font-semibold text-gray-800 shadow-sm">
           탄수화물: {food.carbohydrate_g} g

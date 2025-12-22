@@ -14,6 +14,8 @@ import {
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 export default function MyFoodchart() {
   const [user, setUser] = useState(null);
   const [weeklyData, setWeeklyData] = useState({});
@@ -22,7 +24,7 @@ export default function MyFoodchart() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/api/me", { withCredentials: true })
+      .get(`${API_BASE}/api/me`, { withCredentials: true })
       .then((res) => setUser(res.data))
       .catch(() => {
         alert("로그인이 필요합니다.");
@@ -33,7 +35,7 @@ export default function MyFoodchart() {
   useEffect(() => {
     if (!user?.id) return;
     axios
-      .get("http://localhost:5000/api/weekly-summary", {
+      .get(`${API_BASE}/api/weekly-summary`, {
         params: { user_id: user.id },
       })
       .then((res) => {

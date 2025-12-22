@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
 function Mainpage() {
   const [query, setQuery] = useState("");
   const [foods, setFoods] = useState([]);
@@ -51,7 +53,7 @@ function Mainpage() {
   const fetchList = useCallback(async () => {
     setLoadingList(true);
     try {
-      const res = await fetch("http://localhost:5000/api/foods");
+      const res = await fetch(`${API_BASE}/api/foods`);
       const data = await res.json();
       safeSetFoods(data);
     } catch (err) {
@@ -87,9 +89,7 @@ function Mainpage() {
     try {
       setLoadingList(true);
       const res = await fetch(
-        `http://localhost:5000/api/foods?search=${encodeURIComponent(
-          searchTerm || ""
-        )}`
+        `${API_BASE}/api/foods?search=${encodeURIComponent(searchTerm || "")}`
       );
       const data = await res.json();
       safeSetFoods(data);
@@ -113,9 +113,7 @@ function Mainpage() {
     const tid = setTimeout(async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/foods/autocomplete?q=${encodeURIComponent(
-            query
-          )}`
+          `${API_BASE}/api/foods/autocomplete?q=${encodeURIComponent(query)}`
         );
         const data = await res.json();
         if (Array.isArray(data)) setSuggestions(data);
@@ -137,9 +135,7 @@ function Mainpage() {
     try {
       setLoadingList(true);
       const res = await fetch(
-        `http://localhost:5000/api/foods/by-initial?initial=${encodeURIComponent(
-          ch
-        )}`
+        `${API_BASE}/api/foods/by-initial?initial=${encodeURIComponent(ch)}`
       );
       const data = await res.json();
       safeSetFoods(data);
@@ -159,9 +155,7 @@ function Mainpage() {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/recipes/search?name=${encodeURIComponent(
-          safeName
-        )}`
+        `${API_BASE}/api/recipes/search?name=${encodeURIComponent(safeName)}`
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
@@ -214,7 +208,7 @@ function Mainpage() {
 
     setSending(true);
     try {
-      const res = await fetch("http://localhost:5000/api/recommend", {
+      const res = await fetch(`${API_BASE}/api/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userText }),

@@ -13,7 +13,7 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/signup", {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -23,10 +23,7 @@ function Signup() {
       setMessage(data.message);
 
       if (res.ok) {
-        // 회원가입 성공 시 1초 후 로그인 페이지로 이동
-        setTimeout(() => {
-          navigate("/login");
-        }, 1000);
+        setTimeout(() => navigate("/login"), 1000);
       }
     } catch (err) {
       console.error(err);
@@ -48,7 +45,6 @@ function Signup() {
           value={form.username}
           onChange={handleChange}
           required
-          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="password"
@@ -57,7 +53,6 @@ function Signup() {
           value={form.password}
           onChange={handleChange}
           required
-          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="text"
@@ -66,17 +61,11 @@ function Signup() {
           value={form.name}
           onChange={handleChange}
           required
-          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
-        <button
-          type="submit"
-          className="p-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-400 transition duration-300"
-        >
-          회원가입
-        </button>
+        <button type="submit">회원가입</button>
       </form>
 
-      <p className="text-center mt-3 font-semibold text-gray-700">{message}</p>
+      <p>{message}</p>
     </div>
   );
 }
