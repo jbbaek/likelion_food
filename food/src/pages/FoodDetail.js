@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-
-const API_BASE = process.env.REACT_APP_API_BASE;
+import { API_BASE } from "../config"; 
 
 function FoodDetail() {
   const { id } = useParams();

@@ -1,8 +1,7 @@
 // RecipeDetail.js
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const API_BASE = process.env.REACT_APP_API_BASE;
+import { API_BASE } from "../config";
 
 function RecipeDetail() {
   const { seq } = useParams();

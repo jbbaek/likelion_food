@@ -13,8 +13,7 @@ import {
   Scatter,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
-
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:5000";
+import { API_BASE } from "../config";
 
 export default function MyFoodchart() {
   const [user, setUser] = useState(null);
