@@ -11,9 +11,13 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-// ✅ Cloud Run 프록시 뒤면 세션보다 먼저
+// ✅ healthz는 제일 먼저
+app.get("/healthz", (req, res) => res.status(200).send("ok"));
+
+// ✅ Cloud Run 필수
 app.set("trust proxy", 1);
 
+// ✅ CORS
 const allowedOrigins = [
   "https://likelion-food-frontend-572489305334.us-central1.run.app",
   "http://localhost:3000",
@@ -21,36 +25,34 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS: " + origin));
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS: " + origin));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
 app.options("*", cors());
 
-// ✅ health
-app.get("/healthz", (req, res) => res.status(200).send("ok"));
-
-// ✅ 세션은 1번만
+// ✅ session은 1번만
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "secret_key",
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       secure: true,
       sameSite: "none",
+      maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
 
-// ✅ Pool
+// ✅ DB는 pool만, connect() 금지
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -62,10 +64,9 @@ const db = mysql.createPool({
   queueLimit: 0,
 });
 
-// ✅ pool 테스트 (서버는 계속 살아야 하니까 죽이지 말고 로그만)
 db.query("SELECT 1", (err) => {
-  if (err) console.error("DB 풀 연결 테스트 실패:", err.message);
-  else console.log("DB 풀 연결 OK");
+  if (err) console.error("DB test failed:", err.message);
+  else console.log("DB test OK");
 });
 
 // ================= 회원 관련 =================
@@ -398,7 +399,9 @@ const RECIPES_JSONL_PATH = path.resolve(
 // seq -> 레시피 찾아서 반환
 function findRecipeBySeqFromJsonl(seq) {
   if (!fs.existsSync(RECIPES_JSONL_PATH)) {
-    throw new Error(`recipes.jsonl 파일이 없습니다: ${RECIPES_JSONL_PATH}`);
+    return res
+      .status(404)
+      .json({ message: "recipes.jsonl not found on server" });
   }
   const content = fs.readFileSync(RECIPES_JSONL_PATH, "utf-8");
   const lines = content.split(/\r?\n/);
