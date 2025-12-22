@@ -7,7 +7,7 @@ const cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
 
-const AI_SERVER_URL = process.env.AI_SERVER_URL;
+const AI_SERVER_URL = "https://likelion-food-572489305334.us-central1.run.app";
 
 const fs = require("fs");
 const path = require("path");
@@ -67,13 +67,21 @@ app.use(
   })
 );
 
-// DB 연결
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   charset: "utf8mb4",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
+// 서버 시작 시 간단 체크(선택)
+db.query("SELECT 1", (err) => {
+  if (err) console.error("DB 풀 연결 테스트 실패:", err.message);
+  else console.log("DB 풀 연결 OK");
 });
 
 db.connect((err) => {
