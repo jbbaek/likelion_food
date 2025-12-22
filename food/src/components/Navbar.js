@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { API_BASE } from "../config";
 
 function Navbar() {
   const [user, setUser] = useState(null);
@@ -9,7 +10,7 @@ function Navbar() {
   // 페이지 로드 및 경로 변경 시 로그인 상태 확인
   const checkLogin = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/me", {
+      const res = await fetch(`${API_BASE}/api/me`, {
         method: "GET",
         credentials: "include",
       });

@@ -15,22 +15,32 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-// CORS
+import cors from "cors";
+
 const allowedOrigins = [
+  "https://likelion-food-frontend-572489305334.us-central1.run.app",
   "http://localhost:3000",
-  process.env.FRONTEND_ORIGIN, // Cloud Run 프론트 URL 넣어줄거
-].filter(Boolean);
+];
 
 app.use(
   cors({
-    origin: function (origin, cb) {
-      if (!origin) return cb(null, true); // Postman/서버 간 호출
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("Not allowed by CORS"));
+    origin: function (origin, callback) {
+      // origin 없는 경우(Postman/서버-서버 호출)는 허용
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS: " + origin));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// preflight 대응 (중요)
+app.options("*", cors());
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -42,8 +52,8 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: isProd, // prod면 true
-      sameSite: isProd ? "none" : "lax", // cross-site 쿠키 필요하면 none
+      secure: true,
+      sameSite: "none",
     },
   })
 );
