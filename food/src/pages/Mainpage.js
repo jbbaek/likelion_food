@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 const API_BASE = process.env.REACT_APP_API_BASE;
 
+console.log("API_BASE =", API_BASE);
+
 function Mainpage() {
   const [query, setQuery] = useState("");
   const [foods, setFoods] = useState([]);
