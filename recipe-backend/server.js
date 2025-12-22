@@ -4,6 +4,12 @@ const bcrypt = require("bcrypt");
 const session = require("express-session");
 const cors = require("cors");
 require("dotenv").config();
+process.on("uncaughtException", (err) => {
+  console.error("❌ uncaughtException:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("❌ unhandledRejection:", err);
+});
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
@@ -52,22 +58,42 @@ app.use(
   })
 );
 
-// ✅ DB는 pool만, connect() 금지
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  charset: "utf8mb4",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+let db = null;
 
-db.query("SELECT 1", (err) => {
-  if (err) console.error("DB test failed:", err.message);
-  else console.log("DB test OK");
-});
+const hasDbEnv =
+  process.env.DB_HOST &&
+  process.env.DB_USER &&
+  process.env.DB_PASSWORD &&
+  process.env.DB_NAME;
+
+if (!hasDbEnv) {
+  console.error("❌ DB env missing. Server will run without DB.");
+} else {
+  db = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    charset: "utf8mb4",
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  });
+
+  // ✅ 서버 뜬 뒤에 테스트(시작 크래시 방지)
+  setTimeout(() => {
+    db.query("SELECT 1", (err) => {
+      if (err) console.error("❌ DB test failed:", err.message);
+      else console.log("✅ DB test OK");
+    });
+  }, 1000);
+}
+
+// ✅ DB 없으면 503 반환하는 가드
+function requireDb(req, res, next) {
+  if (!db) return res.status(503).json({ message: "DB not configured" });
+  next();
+}
 
 // ================= 회원 관련 =================
 
