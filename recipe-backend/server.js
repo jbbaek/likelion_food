@@ -15,29 +15,44 @@ const app = express();
 app.use(express.json());
 
 // CORS
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_ORIGIN, // Cloud Run 프론트 URL 넣어줄거
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: function (origin, cb) {
+      if (!origin) return cb(null, true); // Postman/서버 간 호출
+      if (allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
 
-// 세션 (개발용)
+const isProd = process.env.NODE_ENV === "production";
+
+app.set("trust proxy", 1); // Cloud Run 프록시 뒤에서 필수
+
 app.use(
   session({
-    secret: "secret_key",
+    secret: process.env.SESSION_SECRET || "secret_key",
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false },
+    saveUninitialized: false,
+    cookie: {
+      secure: isProd, // prod면 true
+      sameSite: isProd ? "none" : "lax", // cross-site 쿠키 필요하면 none
+    },
   })
 );
 
 // DB 연결
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "manager",
-  password: "1234",
-  database: "foods",
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   charset: "utf8mb4",
 });
 
@@ -428,7 +443,9 @@ app.post("/api/recommend", async (req, res) => {
   }
 
   try {
-    const response = await axios.post("http://127.0.0.1:8000/chat", {
+    const AI_SERVER_URL = process.env.AI_SERVER_URL; // 예: https://ai-xxxxx.a.run.app
+
+    await axios.post(`${AI_SERVER_URL}/chat`, {
       message,
       top_k: 3,
     });
@@ -443,4 +460,7 @@ app.post("/api/recommend", async (req, res) => {
 });
 
 // 서버 시작
-app.listen(5000, () => console.log("Server running on http://localhost:5000"));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
