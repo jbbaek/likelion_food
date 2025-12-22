@@ -41,7 +41,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.options("*", cors());
+app.options(/.*/, cors());
 
 // ✅ session은 1번만
 app.use(
@@ -191,7 +191,7 @@ app.get("/api/foods", requireDb, (req, res) => {
 });
 
 // 자동완성
-app.get("/api/foods/autocomplete", (req, res) => {
+app.get("/api/foods/autocomplete", requireDb, (req, res) => {
   const keyword = (req.query.q || "").trim();
   if (!keyword) return res.json([]);
 
@@ -209,7 +209,7 @@ app.get("/api/foods/autocomplete", (req, res) => {
 });
 
 // 초성별 검색
-app.get("/api/foods/by-initial", (req, res) => {
+app.get("/api/foods/by-initial", requireDb, (req, res) => {
   const initial = (req.query.initial || "").trim();
   if (!initial) return res.status(400).json({ message: "초성 필요" });
 
@@ -266,7 +266,7 @@ app.get("/api/foods/by-initial", (req, res) => {
 });
 
 // 음식 상세 (내 DB foods 테이블 기준)
-app.get("/api/foods/:id", (req, res) => {
+app.get("/api/foods/:id", requireDb, (req, res) => {
   const { id } = req.params;
 
   const sql = `
@@ -303,7 +303,7 @@ app.get("/api/foods/:id", (req, res) => {
 });
 
 // ================= 섭취 기록 =================
-app.post("/api/records/add", (req, res) => {
+app.post("/api/records/add", requireDb, (req, res) => {
   const { user_id, food_id, quantity, record_date, meal_type } = req.body;
   if (!user_id || !food_id || !record_date || !meal_type)
     return res.status(400).json({ message: "필수 항목 누락" });
@@ -327,7 +327,7 @@ app.post("/api/records/add", (req, res) => {
   );
 });
 
-app.get("/api/records/list", (req, res) => {
+app.get("/api/records/list", requireDb, (req, res) => {
   const { user_id, record_date } = req.query;
   if (!user_id || !record_date)
     return res.status(400).json({ message: "user_id와 record_date 필요" });
@@ -356,7 +356,7 @@ app.get("/api/records/list", (req, res) => {
   );
 });
 
-app.delete("/api/records/delete/:id", (req, res) => {
+app.delete("/api/records/delete/:id", requireDb, (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM records WHERE id=?", [id], (err) => {
     if (err) return res.status(500).json({ message: err.message });
@@ -364,7 +364,7 @@ app.delete("/api/records/delete/:id", (req, res) => {
   });
 });
 
-app.get("/api/records/summary", (req, res) => {
+app.get("/api/records/summary", requireDb, (req, res) => {
   const { user_id, record_date } = req.query;
   if (!user_id || !record_date)
     return res.status(400).json({ message: "user_id와 record_date 필요" });
@@ -389,7 +389,7 @@ app.get("/api/records/summary", (req, res) => {
   );
 });
 
-app.get("/api/weekly-summary", (req, res) => {
+app.get("/api/weekly-summary", requireDb, (req, res) => {
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ message: "user_id 필요" });
 
