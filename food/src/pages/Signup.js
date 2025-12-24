@@ -17,6 +17,8 @@ function Signup() {
       const res = await fetch(`${API_BASE}/api/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // ✅ 세션/쿠키 기반이면 회원가입도 include 해두는 게 안전
+        credentials: "include",
         body: JSON.stringify(form),
       });
 
@@ -46,6 +48,7 @@ function Signup() {
           value={form.username}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="password"
@@ -54,6 +57,7 @@ function Signup() {
           value={form.password}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
         <input
           type="text"
@@ -62,11 +66,17 @@ function Signup() {
           value={form.name}
           onChange={handleChange}
           required
+          className="p-2 border border-yellow-400 rounded-md text-sm focus:outline-none focus:border-orange-500"
         />
-        <button type="submit">회원가입</button>
+        <button
+          type="submit"
+          className="p-2 bg-orange-500 text-white font-bold rounded-md hover:bg-orange-400 transition duration-300"
+        >
+          회원가입
+        </button>
       </form>
 
-      <p>{message}</p>
+      <p className="text-center mt-3 font-semibold text-gray-700">{message}</p>
     </div>
   );
 }
