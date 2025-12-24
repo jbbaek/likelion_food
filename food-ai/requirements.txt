@@ -1,10 +1,6 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-
 fastapi
 uvicorn[standard]
 numpy
 rank-bm25
 faiss-cpu
 sentence-transformers
-
-torch==2.3.1+cpu
