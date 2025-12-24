@@ -1,2 +1,6 @@
 fastapi
 uvicorn[standard]
+numpy
+rank-bm25
+faiss-cpu
+sentence-transformers
