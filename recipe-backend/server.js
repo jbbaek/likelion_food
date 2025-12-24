@@ -59,18 +59,17 @@ app.use(
 );
 
 const hasDbEnv =
-  !!process.env.DB_HOST &&
   !!process.env.DB_USER &&
   !!process.env.DB_PASSWORD &&
-  !!process.env.DB_NAME;
+  !!process.env.DB_NAME &&
+  (!!process.env.INSTANCE_CONNECTION_NAME || !!process.env.DB_HOST);
 
 let db = null;
 
 if (!hasDbEnv) {
   console.error("❌ DB env missing. Server will run without DB.");
 } else {
-  db = mysql.createPool({
-    host: process.env.DB_HOST,
+  const baseConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -78,7 +77,27 @@ if (!hasDbEnv) {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-  });
+  };
+
+  if (process.env.INSTANCE_CONNECTION_NAME) {
+    // ✅ Cloud Run + Cloud SQL (Unix socket)
+    db = mysql.createPool({
+      ...baseConfig,
+      socketPath: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+    });
+    console.log(
+      "✅ Using Cloud SQL Unix socket:",
+      process.env.INSTANCE_CONNECTION_NAME
+    );
+  } else {
+    // ✅ 로컬 개발/일반 서버 (TCP)
+    db = mysql.createPool({
+      ...baseConfig,
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT || 3306),
+    });
+    console.log("✅ Using TCP DB host:", process.env.DB_HOST);
+  }
 
   // ✅ 서버 뜬 뒤에 테스트(시작 크래시 방지)
   setTimeout(() => {
@@ -494,7 +513,6 @@ app.post("/api/recommend", async (req, res) => {
 
 const PORT = process.env.PORT || 8080;
 
-// Cloud Run에서는 0.0.0.0 바인딩 권장
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server listening on ${PORT}`);
 });
