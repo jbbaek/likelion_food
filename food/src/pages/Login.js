@@ -20,7 +20,7 @@ function Login() {
         withCredentials: true,
       });
 
-      const data = await res.json();
+      const data = res.data;
       setMessage(data.message);
 
       if (res.ok) {
