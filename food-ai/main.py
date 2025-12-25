@@ -227,9 +227,6 @@ def load_all_artifacts():
         state["EMBED_MODEL"] = EMBED_MODEL
 
         state["ready"] = True
-        print(f"- recipes: {len(RECIPES)}")
-        print(f"- bm25 tokenized: {len(TOKENIZED)}")
-        print(f"- embed model: {EMBED_MODEL_NAME}")
 
     except Exception as e:
         state["error"] = str(e)
@@ -578,9 +575,7 @@ def chat(req: ChatReq):
     tuned = hard_filter_if_possible(tuned, intent, min_keep=HARD_MIN_KEEP)
 
     candidates = tuned[:CAND_TOP_N]
-    rand_picks = weighted_random_pick(candidates, k=top_k, pool=30, temp=0.9)
-    
-    final_picks = diversify_pick(rand_picks, top_k=top_k, level=DIVERSITY_LEVEL)
+    top_k = clamp_int(req.top_k or 3, 1, 10)
 
     foods = []
     for c in final_picks:
