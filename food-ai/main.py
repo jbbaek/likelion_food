@@ -206,6 +206,21 @@ def load_all_artifacts():
         import faiss
         from rank_bm25 import BM25Okapi
         from sentence_transformers import SentenceTransformer
+        state["step"] = "import_faiss"
+        print("②-1 importing faiss...", flush=True)
+        import faiss
+        print("②-1 faiss OK", flush=True)
+
+        state["step"] = "import_bm25"
+        print("②-2 importing rank_bm25...", flush=True)
+        from rank_bm25 import BM25Okapi
+        print("②-2 bm25 OK", flush=True)
+
+        state["step"] = "import_st"
+        print("②-3 importing sentence_transformers...", flush=True)
+        from sentence_transformers import SentenceTransformer
+        print("②-3 sentence_transformers OK", flush=True)
+
         print("② heavy import 성공", flush=True)
 
         state["step"] = "check_files"
