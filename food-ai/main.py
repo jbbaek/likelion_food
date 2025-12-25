@@ -245,28 +245,13 @@ def load_all_artifacts():
         BM25 = BM25Okapi(TOKENIZED)
 
         state["step"] = "load_faiss"
-        print("⑦ FAISS index 로드", flush=True)
+        print("⑦ FAISS/임베딩 로딩은 일단 생략(USE_FAISS=0 기본)")
         FAISS_INDEX = faiss.read_index(FAISS_PATH)
-
-        state["step"] = "load_meta"
-        print("⑧ meta.pkl 로드", flush=True)
-        with open(META_PATH, "rb") as f:
-            META = pickle.load(f)
-
-        EMBED_MODEL_NAME = META.get(
-            "embed_model_name",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        )
-
-        state["step"] = "load_embed_model"
-        print("⑨ 임베딩 모델 로드:", EMBED_MODEL_NAME, flush=True)
 
         # (옵션) 캐시 경로를 /tmp로 강제해서 Cloud Run에서 안정화
         os.environ.setdefault("HF_HOME", "/tmp/hf")
         os.environ.setdefault("TRANSFORMERS_CACHE", "/tmp/hf")
         os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", "/tmp/hf")
-
-        EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
 
         state.update({
             "RECIPES": RECIPES,
@@ -274,17 +259,14 @@ def load_all_artifacts():
             "SEQ2RECIPE": SEQ2RECIPE,
             "TOKENIZED": TOKENIZED,
             "BM25": BM25,
-            "FAISS_INDEX": FAISS_INDEX,
-            "META": META,
-            "EMBED_MODEL_NAME": EMBED_MODEL_NAME,
-            "EMBED_MODEL": EMBED_MODEL,
-            "ready": True,
-            "error": None,
-            "step": "done",
-            "finished_at": time.time(),
+            "FAISS_INDEX": None,
+            "META": None,
+            "EMBED_MODEL_NAME": None,
+            "EMBED_MODEL": None,
+            "ready": True   # ✅ 여기 중요
         })
 
-        print("✅ 모든 아티팩트 로딩 완료, ready=True", flush=True)
+        print("아티팩트 로딩 완료, ready=True", flush=True)
 
     except Exception as e:
         state["ready"] = False
@@ -635,7 +617,7 @@ def health():
         "step": state.get("step"),
         "error": state.get("error"),
         "traceback": state.get("traceback"),
-        "recipes": len(state["RECIPES"]) if state["RECIPES"] else 0,
+        "recipes": len(state["RECIPES"]) if state.get("RECIPES") is not None else 0,
         "embed_model": state.get("EMBED_MODEL_NAME"),
         "cand_pull": CAND_PULL,
         "cand_top_n": CAND_TOP_N,
