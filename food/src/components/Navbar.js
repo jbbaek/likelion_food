@@ -28,14 +28,13 @@ function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/logout", {
+      const res = await fetch(`${API_BASE}/api/logout`, {
         method: "POST",
         credentials: "include",
       });
-      if (res.ok) {
-        setUser(null);
-        navigate("/login");
-      }
+      if (!res.ok) throw new Error("logout failed");
+      setUser(null);
+      navigate("/login");
     } catch (err) {
       console.error("로그아웃 오류:", err);
     }
