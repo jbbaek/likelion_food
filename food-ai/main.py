@@ -188,47 +188,62 @@ state = {
 
 def load_all_artifacts():
     try:
-        # ✅ 무거운 import는 여기서!
+        print("① load_all_artifacts 시작")
+
         import faiss
         from rank_bm25 import BM25Okapi
         from sentence_transformers import SentenceTransformer
+        print("② heavy import 성공")
 
-        print("=== Loading artifacts ===")
+        print("③ 파일 존재 확인")
         must_exist(RECIPES_PATH, "recipes.jsonl")
         must_exist(TOKENIZED_PATH, "tokenized.pkl")
         must_exist(FAISS_PATH, "faiss.index")
         must_exist(META_PATH, "meta.pkl")
 
+        print("④ recipes.jsonl 로드")
         RECIPES, SEQ2IDX, SEQ2RECIPE = load_recipes_jsonl(RECIPES_PATH)
+        print("   recipes 수:", len(RECIPES))
+
+        print("⑤ tokenized.pkl 로드")
         with open(TOKENIZED_PATH, "rb") as f:
             TOKENIZED = pickle.load(f)
 
+        print("⑥ BM25 생성")
         BM25 = BM25Okapi(TOKENIZED)
+
+        print("⑦ FAISS index 로드")
         FAISS_INDEX = faiss.read_index(FAISS_PATH)
 
+        print("⑧ meta.pkl 로드")
         with open(META_PATH, "rb") as f:
             META = pickle.load(f)
 
-        EMBED_MODEL_NAME = META.get("embed_model_name", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-
+        EMBED_MODEL_NAME = META.get(
+            "embed_model_name",
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        )
+        print("⑨ 임베딩 모델 로드:", EMBED_MODEL_NAME)
         EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
 
-        # ✅ state에 저장
-        state["RECIPES"] = RECIPES
-        state["SEQ2IDX"] = SEQ2IDX
-        state["SEQ2RECIPE"] = SEQ2RECIPE
-        state["TOKENIZED"] = TOKENIZED
-        state["BM25"] = BM25
-        state["FAISS_INDEX"] = FAISS_INDEX
-        state["META"] = META
-        state["EMBED_MODEL_NAME"] = EMBED_MODEL_NAME
-        state["EMBED_MODEL"] = EMBED_MODEL
+        state.update({
+            "RECIPES": RECIPES,
+            "SEQ2IDX": SEQ2IDX,
+            "SEQ2RECIPE": SEQ2RECIPE,
+            "TOKENIZED": TOKENIZED,
+            "BM25": BM25,
+            "FAISS_INDEX": FAISS_INDEX,
+            "META": META,
+            "EMBED_MODEL_NAME": EMBED_MODEL_NAME,
+            "EMBED_MODEL": EMBED_MODEL,
+            "ready": True
+        })
 
-        state["ready"] = True
+        print("✅ 모든 아티팩트 로딩 완료, ready=True")
 
     except Exception as e:
         state["error"] = str(e)
-        print("❌ artifact load failed:", state["error"])
+        print("❌ 아티팩트 로딩 실패:", e)
 
 @app.on_event("startup")
 def startup():
