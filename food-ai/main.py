@@ -209,10 +209,8 @@ def load_all_artifacts():
         with open(META_PATH, "rb") as f:
             META = pickle.load(f)
 
-        EMBED_MODEL_NAME = META.get(
-            "embed_model_name",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        )
+        EMBED_MODEL_NAME = META.get("embed_model_name", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+
         EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
 
         # ✅ state에 저장
@@ -242,10 +240,6 @@ def ensure_ready():
         raise HTTPException(status_code=500, detail=f"초기화 실패: {state['error']}")
     if not state["ready"]:
         raise HTTPException(status_code=503, detail="서버 준비중입니다. 잠시 후 다시 시도해주세요.")
-
-print(f"- recipes: {len(RECIPES)}")
-print(f"- bm25 tokenized: {len(TOKENIZED)}")
-print(f"- embed model: {EMBED_MODEL_NAME}")
 
 # =========================================================
 # 4) 의도(intent) 추출
@@ -560,6 +554,7 @@ def health():
 @app.post("/chat")
 def chat(req: ChatReq):
     ensure_ready()  # ✅ 준비 안 됐으면 503 / 실패면 500
+    top_k = clamp_int(req.top_k or 3, 1, 10)
     user_query = norm_text(req.message)
 
     if not user_query:
@@ -577,7 +572,7 @@ def chat(req: ChatReq):
     candidates = tuned[:CAND_TOP_N]
     rand_picks = weighted_random_pick(candidates, k=top_k, pool=30, temp=0.9)
     final_picks = diversify_pick(rand_picks, top_k=top_k, level=DIVERSITY_LEVEL)
-    top_k = clamp_int(req.top_k or 3, 1, 10)
+
 
     foods = []
     for c in final_picks:

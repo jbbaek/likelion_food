@@ -1,7 +1,9 @@
 fastapi==0.127.0
-uvicorn[standard]==0.40.0
+uvicorn==0.40.0
 numpy==1.26.4
 rank-bm25==0.2.2
 faiss-cpu==1.13.2
 sentence-transformers==5.2.0
-torch==2.9.1
+torch==2.3.1+cpu
+
+--extra-index-url https://download.pytorch.org/whl/cpu
