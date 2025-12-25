@@ -23,7 +23,7 @@ function Login() {
       const data = res.data;
       setMessage(data.message);
 
-      if (res.ok) {
+      if (res.status === 200) {
         const user = data.user;
         navigate("/mypage", { state: { user } });
       }

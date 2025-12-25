@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE } from "../config";
+import axios from "axios";
 
 function Signup() {
   const [form, setForm] = useState({ username: "", password: "", name: "" });
@@ -14,23 +15,21 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/api/signup`, {
-        method: "POST",
+      const res = await axios.post(`${API_BASE}/api/signup`, form, {
         headers: { "Content-Type": "application/json" },
-        // ✅ 세션/쿠키 기반이면 회원가입도 include 해두는 게 안전
-        credentials: "include",
-        body: JSON.stringify(form),
+        withCredentials: true,
       });
 
-      const data = await res.json();
+      const data = res.data;
       setMessage(data.message);
 
-      if (res.ok) {
+      // axios는 res.ok 없음 → status로 판단
+      if (res.status === 200 || res.status === 201) {
         setTimeout(() => navigate("/login"), 1000);
       }
     } catch (err) {
       console.error(err);
-      setMessage("서버 오류 발생");
+      setMessage(err?.response?.data?.message || "서버 오류 발생");
     }
   };
 

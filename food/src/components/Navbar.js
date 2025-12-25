@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { API_BASE } from "../config";
+import axios from "axios";
 
 function Navbar() {
   const [user, setUser] = useState(null);
@@ -28,13 +29,17 @@ function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("logout failed");
-      setUser(null);
-      navigate("/login");
+      const res = await axios.post(
+        `${API_BASE}/api/logout`,
+        {},
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.status === 200) {
+        setUser(null);
+        navigate("/login");
+      }
     } catch (err) {
       console.error("로그아웃 오류:", err);
     }
