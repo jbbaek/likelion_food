@@ -1,0 +1,32 @@
+options:
+  machineType: "E2_HIGHCPU_8"
+
+substitutions:
+  _REGION: "us-central1"
+  _SERVICE: "likelion-ai"
+  _IMAGE: "us-central1-docker.pkg.dev/learned-advice-482012-b6/cloud-run-source-deploy/likelion_food/likelion-ai:docker"
+
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    dir: "food-ai"
+    args: ["build", "-t", "${_IMAGE}", "."]
+
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "${_IMAGE}"]
+
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    args:
+      [
+        "gcloud",
+        "run",
+        "deploy",
+        "${_SERVICE}",
+        "--image",
+        "${_IMAGE}",
+        "--region",
+        "${_REGION}",
+        "--allow-unauthenticated",
+      ]
+
+images:
+  - "${_IMAGE}"
