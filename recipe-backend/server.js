@@ -436,22 +436,21 @@ app.get("/api/recipes/by-seq/:seq", async (req, res) => {
   const seq = String(req.params.seq || "").trim();
   if (!seq) return res.status(400).json({ message: "seq 필요" });
 
-  if (!FASTAPI_BASE) {
+  if (!process.env.AI_SERVER_URL) {
     return res
       .status(500)
       .json({ message: "AI_SERVER_URL 환경변수가 필요합니다." });
   }
 
   try {
-    // ✅ FastAPI에 같은 엔드포인트가 있다고 가정
+    // FastAPI에 아래 엔드포인트가 있어야 함 (3번에서 추가할 것)
     const r = await axios.get(
-      `${FASTAPI_BASE}/recipes/by-seq/${encodeURIComponent(seq)}`
+      `${process.env.AI_SERVER_URL}/recipes/by-seq/${encodeURIComponent(seq)}`
     );
     return res.json(r.data);
   } catch (e) {
-    const status = e.response?.status || 500;
     return res
-      .status(status)
+      .status(e.response?.status || 500)
       .json(e.response?.data || { message: "FastAPI 레시피 조회 실패" });
   }
 });

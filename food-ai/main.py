@@ -683,3 +683,19 @@ def chat(req: ChatReq):
     reply = build_reply(user_query, intent, foods)
     return {"reply": reply, "foods": foods}
 
+from fastapi import HTTPException
+
+@app.get("/recipes/by-seq/{seq}")
+def get_recipe_by_seq(seq: str):
+    ensure_ready()  # 로딩 안 끝났으면 503
+
+    seq = str(seq).strip()
+    if not seq:
+        raise HTTPException(status_code=400, detail="seq 필요")
+
+    r = state["SEQ2RECIPE"].get(seq)
+    if not r:
+        raise HTTPException(status_code=404, detail="해당 SEQ 레시피 없음")
+
+    # 네가 만든 55개 필드 payload로 반환
+    return build_full_recipe_payload(r)
