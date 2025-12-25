@@ -175,6 +175,10 @@ from fastapi import HTTPException
 state = {
     "ready": False,
     "error": None,
+    "traceback": None,
+    "step": None,
+    "started_at": None,
+    "finished_at": None,
     "RECIPES": None,
     "SEQ2IDX": None,
     "SEQ2RECIPE": None,
@@ -186,36 +190,51 @@ state = {
     "EMBED_MODEL": None,
 }
 
+import traceback
+import time
+
 def load_all_artifacts():
     try:
-        print("① load_all_artifacts 시작")
+        state["step"] = "start"
+        state["started_at"] = time.time()
+        print("① load_all_artifacts 시작", flush=True)
+        print("ART_DIR =", ART_DIR, flush=True)
+        print("ART_DIR exists =", os.path.isdir(ART_DIR), flush=True)
+        print("ART_DIR list =", os.listdir(ART_DIR) if os.path.isdir(ART_DIR) else "NOT FOUND", flush=True)
 
+        state["step"] = "heavy_import"
         import faiss
         from rank_bm25 import BM25Okapi
         from sentence_transformers import SentenceTransformer
-        print("② heavy import 성공")
+        print("② heavy import 성공", flush=True)
 
-        print("③ 파일 존재 확인")
+        state["step"] = "check_files"
+        print("③ 파일 존재 확인", flush=True)
         must_exist(RECIPES_PATH, "recipes.jsonl")
         must_exist(TOKENIZED_PATH, "tokenized.pkl")
         must_exist(FAISS_PATH, "faiss.index")
         must_exist(META_PATH, "meta.pkl")
 
-        print("④ recipes.jsonl 로드")
+        state["step"] = "load_recipes"
+        print("④ recipes.jsonl 로드", flush=True)
         RECIPES, SEQ2IDX, SEQ2RECIPE = load_recipes_jsonl(RECIPES_PATH)
-        print("   recipes 수:", len(RECIPES))
+        print("   recipes 수:", len(RECIPES), flush=True)
 
-        print("⑤ tokenized.pkl 로드")
+        state["step"] = "load_tokenized"
+        print("⑤ tokenized.pkl 로드", flush=True)
         with open(TOKENIZED_PATH, "rb") as f:
             TOKENIZED = pickle.load(f)
 
-        print("⑥ BM25 생성")
+        state["step"] = "build_bm25"
+        print("⑥ BM25 생성", flush=True)
         BM25 = BM25Okapi(TOKENIZED)
 
-        print("⑦ FAISS index 로드")
+        state["step"] = "load_faiss"
+        print("⑦ FAISS index 로드", flush=True)
         FAISS_INDEX = faiss.read_index(FAISS_PATH)
 
-        print("⑧ meta.pkl 로드")
+        state["step"] = "load_meta"
+        print("⑧ meta.pkl 로드", flush=True)
         with open(META_PATH, "rb") as f:
             META = pickle.load(f)
 
@@ -223,7 +242,15 @@ def load_all_artifacts():
             "embed_model_name",
             "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         )
-        print("⑨ 임베딩 모델 로드:", EMBED_MODEL_NAME)
+
+        state["step"] = "load_embed_model"
+        print("⑨ 임베딩 모델 로드:", EMBED_MODEL_NAME, flush=True)
+
+        # (옵션) 캐시 경로를 /tmp로 강제해서 Cloud Run에서 안정화
+        os.environ.setdefault("HF_HOME", "/tmp/hf")
+        os.environ.setdefault("TRANSFORMERS_CACHE", "/tmp/hf")
+        os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", "/tmp/hf")
+
         EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
 
         state.update({
@@ -236,14 +263,22 @@ def load_all_artifacts():
             "META": META,
             "EMBED_MODEL_NAME": EMBED_MODEL_NAME,
             "EMBED_MODEL": EMBED_MODEL,
-            "ready": True
+            "ready": True,
+            "error": None,
+            "step": "done",
+            "finished_at": time.time(),
         })
 
-        print("✅ 모든 아티팩트 로딩 완료, ready=True")
+        print("✅ 모든 아티팩트 로딩 완료, ready=True", flush=True)
 
     except Exception as e:
-        state["error"] = str(e)
-        print("❌ 아티팩트 로딩 실패:", e)
+        state["ready"] = False
+        state["error"] = f"{type(e).__name__}: {e}"
+        state["traceback"] = traceback.format_exc()
+        state["step"] = f"failed_at:{state.get('step')}"
+        print("❌ 아티팩트 로딩 실패:", state["error"], flush=True)
+        print(state["traceback"], flush=True)
+
 
 @app.on_event("startup")
 def startup():
@@ -556,9 +591,11 @@ def health():
     return {
         "ok": True,
         "ready": state["ready"],
-        "error": state["error"],
+        "step": state.get("step"),
+        "error": state.get("error"),
+        "traceback": state.get("traceback"),
         "recipes": len(state["RECIPES"]) if state["RECIPES"] else 0,
-        "embed_model": state["EMBED_MODEL_NAME"],
+        "embed_model": state.get("EMBED_MODEL_NAME"),
         "cand_pull": CAND_PULL,
         "cand_top_n": CAND_TOP_N,
         "rrf_k": RRF_K,
