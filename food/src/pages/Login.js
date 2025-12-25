@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, axios } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE } from "../config";
 
@@ -14,11 +14,9 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/api/login`, {
-        method: "POST",
+      const res = await axios.post(`${API_BASE}/api/login`, form, {
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(form),
+        withCredentials: true,
       });
 
       const data = await res.json();

@@ -607,6 +607,17 @@ def weighted_random_pick(cands: List[Dict[str, Any]], k: int, pool: int = 30, te
 # =========================================================
 # 9) 엔드포인트
 # =========================================================
+from fastapi.responses import FileResponse
+
+@app.get("/recipes.jsonl")
+def download_recipes_jsonl():
+    must_exist(RECIPES_PATH, "recipes.jsonl")
+    return FileResponse(
+        RECIPES_PATH,
+        media_type="application/json",
+        filename="recipes.jsonl",
+    )
+
 @app.get("/health")
 def health():
     return {
@@ -671,3 +682,4 @@ def chat(req: ChatReq):
 
     reply = build_reply(user_query, intent, foods)
     return {"reply": reply, "foods": foods}
+

@@ -430,37 +430,31 @@ app.get("/api/weekly-summary", requireDb, (req, res) => {
   });
 });
 
-// =======================================================
-// ✅ 레시피: "제일 쉬운" 해결책 (recipes.jsonl에서 seq로 조회)
-// =======================================================
+const FASTAPI_BASE = process.env.AI_SERVER_URL; // 이미 쓰고 있으니 이걸 재사용
 
-// 🔧 너 FastAPI가 쓰는 recipes.jsonl 위치로 맞춰줘
-const RECIPES_JSONL_PATH = path.resolve(
-  __dirname,
-  "artifacts",
-  "recipes.jsonl"
-);
+app.get("/api/recipes/by-seq/:seq", async (req, res) => {
+  const seq = String(req.params.seq || "").trim();
+  if (!seq) return res.status(400).json({ message: "seq 필요" });
 
-// seq -> 레시피 찾아서 반환
-function findRecipeBySeqFromJsonl(seq) {
-  if (!fs.existsSync(RECIPES_JSONL_PATH)) {
-    return { error: "recipes.jsonl not found on server" };
+  if (!FASTAPI_BASE) {
+    return res
+      .status(500)
+      .json({ message: "AI_SERVER_URL 환경변수가 필요합니다." });
   }
 
-  const content = fs.readFileSync(RECIPES_JSONL_PATH, "utf-8");
-  const lines = content.split(/\r?\n/);
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    try {
-      const obj = JSON.parse(line);
-      if (String(obj.RCP_SEQ) === String(seq)) return { recipe: obj };
-    } catch {
-      // skip
-    }
+  try {
+    // ✅ FastAPI에 같은 엔드포인트가 있다고 가정
+    const r = await axios.get(
+      `${FASTAPI_BASE}/recipes/by-seq/${encodeURIComponent(seq)}`
+    );
+    return res.json(r.data);
+  } catch (e) {
+    const status = e.response?.status || 500;
+    return res
+      .status(status)
+      .json(e.response?.data || { message: "FastAPI 레시피 조회 실패" });
   }
-  return { recipe: null };
-}
+});
 
 app.get("/api/recipes/by-seq/:seq", (req, res) => {
   const seq = String(req.params.seq || "").trim();
@@ -499,9 +493,11 @@ app.post("/api/recommend", async (req, res) => {
   }
 
   try {
+    const { message, top_k } = req.body;
+
     const response = await axios.post(`${process.env.AI_SERVER_URL}/chat`, {
       message,
-      top_k: 3,
+      top_k: Number(top_k || 3),
     });
 
     return res.json(response.data);
