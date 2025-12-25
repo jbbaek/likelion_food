@@ -455,28 +455,6 @@ app.get("/api/recipes/by-seq/:seq", async (req, res) => {
   }
 });
 
-app.get("/api/recipes/by-seq/:seq", (req, res) => {
-  const seq = String(req.params.seq || "").trim();
-  if (!seq) return res.status(400).json({ message: "seq 필요" });
-
-  try {
-    const result = findRecipeBySeqFromJsonl(seq);
-
-    if (result.error) {
-      return res.status(404).json({ message: result.error });
-    }
-    if (!result.recipe) {
-      return res.status(404).json({ message: "해당 SEQ 레시피 없음", seq });
-    }
-    return res.json(result.recipe);
-  } catch (e) {
-    console.error("로컬 seq 조회 오류:", e.message);
-    return res
-      .status(500)
-      .json({ message: "로컬 레시피 조회 오류", error: e.message });
-  }
-});
-
 // ✅ 추천은 기존대로 FastAPI 사용 (그대로 유지)
 app.post("/api/recommend", async (req, res) => {
   const { message } = req.body;
