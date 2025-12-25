@@ -6,9 +6,9 @@ import os, json, re, pickle
 import random
 
 import numpy as np
-import faiss
-from rank_bm25 import BM25Okapi
-from sentence_transformers import SentenceTransformer
+# import faiss
+# from rank_bm25 import BM25Okapi
+# from sentence_transformers import SentenceTransformer
 
 # =========================================================
 # 0) 설정
@@ -169,25 +169,82 @@ def load_recipes_jsonl(path: str):
                 seq2recipe[seq] = obj
     return recipes, seq2idx, seq2recipe
 
-print("=== Loading artifacts ===")
-must_exist(RECIPES_PATH, "recipes.jsonl")
-must_exist(TOKENIZED_PATH, "tokenized.pkl")
-must_exist(FAISS_PATH, "faiss.index")
-must_exist(META_PATH, "meta.pkl")
+import threading
+from fastapi import HTTPException
 
-RECIPES, SEQ2IDX, SEQ2RECIPE = load_recipes_jsonl(RECIPES_PATH)
+state = {
+    "ready": False,
+    "error": None,
+    "RECIPES": None,
+    "SEQ2IDX": None,
+    "SEQ2RECIPE": None,
+    "TOKENIZED": None,
+    "BM25": None,
+    "FAISS_INDEX": None,
+    "META": None,
+    "EMBED_MODEL_NAME": None,
+    "EMBED_MODEL": None,
+}
 
-with open(TOKENIZED_PATH, "rb") as f:
-    TOKENIZED = pickle.load(f)
+def load_all_artifacts():
+    try:
+        # ✅ 무거운 import는 여기서!
+        import faiss
+        from rank_bm25 import BM25Okapi
+        from sentence_transformers import SentenceTransformer
 
-BM25 = BM25Okapi(TOKENIZED)
-FAISS_INDEX = faiss.read_index(FAISS_PATH)
+        print("=== Loading artifacts ===")
+        must_exist(RECIPES_PATH, "recipes.jsonl")
+        must_exist(TOKENIZED_PATH, "tokenized.pkl")
+        must_exist(FAISS_PATH, "faiss.index")
+        must_exist(META_PATH, "meta.pkl")
 
-with open(META_PATH, "rb") as f:
-    META = pickle.load(f)
+        RECIPES, SEQ2IDX, SEQ2RECIPE = load_recipes_jsonl(RECIPES_PATH)
+        with open(TOKENIZED_PATH, "rb") as f:
+            TOKENIZED = pickle.load(f)
 
-EMBED_MODEL_NAME = META.get("embed_model_name", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
+        BM25 = BM25Okapi(TOKENIZED)
+        FAISS_INDEX = faiss.read_index(FAISS_PATH)
+
+        with open(META_PATH, "rb") as f:
+            META = pickle.load(f)
+
+        EMBED_MODEL_NAME = META.get(
+            "embed_model_name",
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        )
+        EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
+
+        # ✅ state에 저장
+        state["RECIPES"] = RECIPES
+        state["SEQ2IDX"] = SEQ2IDX
+        state["SEQ2RECIPE"] = SEQ2RECIPE
+        state["TOKENIZED"] = TOKENIZED
+        state["BM25"] = BM25
+        state["FAISS_INDEX"] = FAISS_INDEX
+        state["META"] = META
+        state["EMBED_MODEL_NAME"] = EMBED_MODEL_NAME
+        state["EMBED_MODEL"] = EMBED_MODEL
+
+        state["ready"] = True
+        print(f"- recipes: {len(RECIPES)}")
+        print(f"- bm25 tokenized: {len(TOKENIZED)}")
+        print(f"- embed model: {EMBED_MODEL_NAME}")
+
+    except Exception as e:
+        state["error"] = str(e)
+        print("❌ artifact load failed:", state["error"])
+
+@app.on_event("startup")
+def startup():
+    # ✅ 서버는 바로 뜨고(포트 리슨), 로딩은 뒤에서
+    threading.Thread(target=load_all_artifacts, daemon=True).start()
+
+def ensure_ready():
+    if state["error"]:
+        raise HTTPException(status_code=500, detail=f"초기화 실패: {state['error']}")
+    if not state["ready"]:
+        raise HTTPException(status_code=503, detail="서버 준비중입니다. 잠시 후 다시 시도해주세요.")
 
 print(f"- recipes: {len(RECIPES)}")
 print(f"- bm25 tokenized: {len(TOKENIZED)}")
@@ -219,13 +276,16 @@ def parse_intent(q: str) -> Dict[str, int]:
 # =========================================================
 def bm25_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
     q_tokens = tokenize_with_ngrams_for_bm25(query)
+    BM25 = state["BM25"]
     scores = BM25.get_scores(q_tokens)
     idxs = np.argsort(scores)[::-1][:top_n]
     return [(int(i), float(scores[i])) for i in idxs]
 
 def faiss_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
+    EMBED_MODEL = state["EMBED_MODEL"]
+    FAISS_INDEX = state["FAISS_INDEX"]
+
     q_emb = EMBED_MODEL.encode([query], normalize_embeddings=True)
-    q_emb = safe_float_list(q_emb)
     D, I = FAISS_INDEX.search(q_emb, top_n)
     I = I[0].tolist()
     D = D[0].tolist()
@@ -258,6 +318,7 @@ def rrf_mix_candidates(query: str, top_n: int, pull_n: int, k: int = 60) -> List
 
     out = []
     for idx, score in scored[:top_n]:
+        RECIPES = state["RECIPES"]
         r = RECIPES[idx]
         out.append({
             "RCP_SEQ": str(r.get("RCP_SEQ", "")).strip(),
@@ -488,8 +549,10 @@ def weighted_random_pick(cands: List[Dict[str, Any]], k: int, pool: int = 30, te
 def health():
     return {
         "ok": True,
-        "recipes": len(RECIPES),
-        "embed_model": EMBED_MODEL_NAME,
+        "ready": state["ready"],
+        "error": state["error"],
+        "recipes": len(state["RECIPES"]) if state["RECIPES"] else 0,
+        "embed_model": state["EMBED_MODEL_NAME"],
         "cand_pull": CAND_PULL,
         "cand_top_n": CAND_TOP_N,
         "rrf_k": RRF_K,
@@ -499,8 +562,8 @@ def health():
 
 @app.post("/chat")
 def chat(req: ChatReq):
+    ensure_ready()  # ✅ 준비 안 됐으면 503 / 실패면 500
     user_query = norm_text(req.message)
-    top_k = clamp_int(req.top_k or 3, 1, 5)
 
     if not user_query:
         return {"reply": "요청이 비어 있어요.", "foods": []}
@@ -522,7 +585,9 @@ def chat(req: ChatReq):
     foods = []
     for c in final_picks:
         seq = str(c.get("RCP_SEQ","")).strip()
+        SEQ2RECIPE = state["SEQ2RECIPE"]
         r = SEQ2RECIPE.get(seq)
+
         if not r:
             continue
 
