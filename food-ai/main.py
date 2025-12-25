@@ -221,7 +221,7 @@ def load_all_artifacts():
         from sentence_transformers import SentenceTransformer
         print("②-3 sentence_transformers OK", flush=True)
 
-        print("② heavy import 성공", flush=True)
+        print("② bm25 import 성공")
 
         state["step"] = "check_files"
         print("③ 파일 존재 확인", flush=True)
@@ -353,8 +353,34 @@ def faiss_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
         out.append((int(i), float(d)))
     return out
 
+USE_FAISS = os.getenv("USE_FAISS", "0") == "1"
+
 def rrf_mix_candidates(query: str, top_n: int, pull_n: int, k: int = 60) -> List[Dict[str, Any]]:
     a = bm25_candidates(query, pull_n)
+
+    # ✅ FAISS 비활성 or 로딩 안 됨 → BM25만 사용
+    if (not USE_FAISS) or (state.get("FAISS_INDEX") is None) or (state.get("EMBED_MODEL") is None):
+        a.sort(key=lambda x: x[1], reverse=True)
+        out = []
+        RECIPES = state["RECIPES"]
+        for idx, score in a[:top_n]:
+            r = RECIPES[idx]
+            out.append({
+                "RCP_SEQ": str(r.get("RCP_SEQ", "")).strip(),
+                "RCP_NM": r.get("RCP_NM", ""),
+                "RCP_PAT2": r.get("RCP_PAT2", ""),
+                "RCP_WAY2": r.get("RCP_WAY2", ""),
+                "HASH_TAG": r.get("HASH_TAG", ""),
+                "RCP_PARTS_DTLS": r.get("RCP_PARTS_DTLS", ""),
+                "auto_tags": r.get("auto_tags", []),
+                "is_soupish": r.get("is_soupish", 0),
+                "spicy_score": float(r.get("spicy_score", 0.0) or 0.0),
+                "greasy_score": float(r.get("greasy_score", 0.0) or 0.0),
+                "_mix_score": float(score),  # ✅ BM25 점수로 대체
+            })
+        return out
+
+    # ✅ FAISS까지 정상 로딩된 경우만 RRF 수행
     b = faiss_candidates(query, pull_n)
 
     rank_a = {idx: r for r, (idx, _) in enumerate(a)}
@@ -373,8 +399,8 @@ def rrf_mix_candidates(query: str, top_n: int, pull_n: int, k: int = 60) -> List
     scored.sort(key=lambda x: x[1], reverse=True)
 
     out = []
+    RECIPES = state["RECIPES"]
     for idx, score in scored[:top_n]:
-        RECIPES = state["RECIPES"]
         r = RECIPES[idx]
         out.append({
             "RCP_SEQ": str(r.get("RCP_SEQ", "")).strip(),
