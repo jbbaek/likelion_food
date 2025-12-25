@@ -193,65 +193,61 @@ state = {
 import traceback
 import time
 
+USE_FAISS = os.getenv("USE_FAISS", "0") == "1"
+
 def load_all_artifacts():
     try:
         state["step"] = "start"
         state["started_at"] = time.time()
         print("① load_all_artifacts 시작", flush=True)
+
         print("ART_DIR =", ART_DIR, flush=True)
         print("ART_DIR exists =", os.path.isdir(ART_DIR), flush=True)
         print("ART_DIR list =", os.listdir(ART_DIR) if os.path.isdir(ART_DIR) else "NOT FOUND", flush=True)
 
+        # ✅ BM25만 import
         state["step"] = "heavy_import"
-        import faiss
+        print("② importing rank_bm25 only...", flush=True)
         from rank_bm25 import BM25Okapi
-        from sentence_transformers import SentenceTransformer
-        state["step"] = "import_faiss"
-        print("②-1 importing faiss...", flush=True)
-        import faiss
-        print("②-1 faiss OK", flush=True)
+        print("② bm25 OK", flush=True)
 
-        state["step"] = "import_bm25"
-        print("②-2 importing rank_bm25...", flush=True)
-        from rank_bm25 import BM25Okapi
-        print("②-2 bm25 OK", flush=True)
-
-        state["step"] = "import_st"
-        print("②-3 importing sentence_transformers...", flush=True)
-        from sentence_transformers import SentenceTransformer
-        print("②-3 sentence_transformers OK", flush=True)
-
-        print("② bm25 import 성공")
-
+        # ✅ 파일 체크 (BM25 필수만)
         state["step"] = "check_files"
-        print("③ 파일 존재 확인", flush=True)
         must_exist(RECIPES_PATH, "recipes.jsonl")
         must_exist(TOKENIZED_PATH, "tokenized.pkl")
-        must_exist(FAISS_PATH, "faiss.index")
-        must_exist(META_PATH, "meta.pkl")
+        if USE_FAISS:
+            must_exist(FAISS_PATH, "faiss.index")
+            must_exist(META_PATH, "meta.pkl")
 
+        # ✅ recipes
         state["step"] = "load_recipes"
-        print("④ recipes.jsonl 로드", flush=True)
         RECIPES, SEQ2IDX, SEQ2RECIPE = load_recipes_jsonl(RECIPES_PATH)
-        print("   recipes 수:", len(RECIPES), flush=True)
+        print("recipes 수:", len(RECIPES), flush=True)
 
+        # ✅ tokenized
         state["step"] = "load_tokenized"
-        print("⑤ tokenized.pkl 로드", flush=True)
         with open(TOKENIZED_PATH, "rb") as f:
             TOKENIZED = pickle.load(f)
 
+        # ✅ bm25
         state["step"] = "build_bm25"
-        print("⑥ BM25 생성", flush=True)
         BM25 = BM25Okapi(TOKENIZED)
 
-        state["step"] = "load_faiss"
-        print("⑦ FAISS/임베딩 로딩은 일단 생략(USE_FAISS=0 기본)")
-        FAISS_INDEX = faiss.read_index(FAISS_PATH)
+        # ✅ 기본은 FAISS/임베딩 안 씀
+        FAISS_INDEX = None
+        META = None
+        EMBED_MODEL_NAME = None
+        EMBED_MODEL = None
 
-        # (옵션) 캐시 경로를 /tmp로 강제해서 Cloud Run에서 안정화
-        os.environ.setdefault("HF_HOME", "/tmp/hf")
-        os.environ.setdefault("TRANSFORMERS_CACHE", "/tmp/hf")
-        os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", "/tmp/hf")
+        # (선택) USE_FAISS=1일 때만 로딩
+        if USE_FAISS:
+            state["step"] = "load_faiss"
+            import faiss
+            FAISS_INDEX = faiss.read_index(FAISS_PATH)
+
+            state["step"] = "load_meta"
+            with open(META_PATH, "rb") as f:
+                META = pickle.load(f)
 
         state.update({
             "RECIPES": RECIPES,
@@ -259,28 +255,31 @@ def load_all_artifacts():
             "SEQ2RECIPE": SEQ2RECIPE,
             "TOKENIZED": TOKENIZED,
             "BM25": BM25,
-            "FAISS_INDEX": None,
-            "META": None,
-            "EMBED_MODEL_NAME": None,
-            "EMBED_MODEL": None,
-            "ready": True   # ✅ 여기 중요
+            "FAISS_INDEX": FAISS_INDEX,
+            "META": META,
+            "EMBED_MODEL_NAME": EMBED_MODEL_NAME,
+            "EMBED_MODEL": EMBED_MODEL,
+            "error": None,
+            "traceback": None,
+            "ready": True,
         })
-
-        print("아티팩트 로딩 완료, ready=True", flush=True)
+        state["step"] = "ready"
+        state["finished_at"] = time.time()
+        print("✅ 로딩 완료 ready=True", flush=True)
 
     except Exception as e:
         state["ready"] = False
         state["error"] = f"{type(e).__name__}: {e}"
         state["traceback"] = traceback.format_exc()
         state["step"] = f"failed_at:{state.get('step')}"
-        print("❌ 아티팩트 로딩 실패:", state["error"], flush=True)
+        print("❌ 로딩 실패:", state["error"], flush=True)
         print(state["traceback"], flush=True)
+
 
 
 @app.on_event("startup")
 def startup():
-    # ✅ 서버는 바로 뜨고(포트 리슨), 로딩은 뒤에서
-    threading.Thread(target=load_all_artifacts, daemon=True).start()
+    load_all_artifacts()  
 
 def ensure_ready():
     if state["error"]:
@@ -320,9 +319,10 @@ def bm25_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
     return [(int(i), float(scores[i])) for i in idxs]
 
 def faiss_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
-    EMBED_MODEL = state["EMBED_MODEL"]
-    FAISS_INDEX = state["FAISS_INDEX"]
-
+    EMBED_MODEL = state.get("EMBED_MODEL")
+    FAISS_INDEX = state.get("FAISS_INDEX")
+    if (EMBED_MODEL is None) or (FAISS_INDEX is None):
+        return []
     q_emb = EMBED_MODEL.encode([query], normalize_embeddings=True)
     D, I = FAISS_INDEX.search(q_emb, top_n)
     I = I[0].tolist()
@@ -334,8 +334,6 @@ def faiss_candidates(query: str, top_n: int) -> List[Tuple[int, float]]:
             continue
         out.append((int(i), float(d)))
     return out
-
-USE_FAISS = os.getenv("USE_FAISS", "0") == "1"
 
 def rrf_mix_candidates(query: str, top_n: int, pull_n: int, k: int = 60) -> List[Dict[str, Any]]:
     a = bm25_candidates(query, pull_n)
